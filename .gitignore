@@ -1,2 +1,17 @@
+# Variáveis de ambiente
 .env
+.env.*
+
+# Permite manter um exemplo sem senhas reais
+!.env.example
+
+# Configurações locais do VS Code
 .vscode/settings.json
+
+# Maven - arquivos gerados
+target/
+
+# Eclipse
+.classpath
+.project
+.settings/
