@@ -5,21 +5,22 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.persistence.Table;
+import jakarta.persistence.Column;
 
 @Entity
+@Table(name = "users")
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    @NotBlank
+
     private String nome;
-    @NotBlank
-    @Email 
+
+    @Column(nullable = false, unique = true)
     private String email;
-    @NotBlank 
+
     private String senha;
 
     public User(String nome, String email, String senha) {
@@ -45,6 +46,11 @@ public class User {
 
     public String getSenha() {
         return senha;
+    }
+
+    public void atualizar(String nome, String email) {
+        this.nome = nome;
+        this.email = email;
     }
 
 }

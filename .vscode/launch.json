@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "ms1-users",
+            "request": "launch",
+            "mainClass": "com.beca.ms1_users.Ms1UsersApplication",
+            "projectName": "ms1-users",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
