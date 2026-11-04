@@ -1,110 +1,97 @@
+
 package com.beca.ms1_users.application;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.beca.ms1_users.application.port.in.RegisterUserUseCase;
+import com.beca.ms1_users.application.port.in.UserUseCase;
+import com.beca.ms1_users.application.port.in.RegisterUserCommand;
+import com.beca.ms1_users.application.port.in.UpdateUserCommand;
 import com.beca.ms1_users.application.port.out.UserRepositoryPort;
+import com.beca.ms1_users.domain.EmailAlreadyExistsException;
 import com.beca.ms1_users.domain.User;
-import com.beca.ms1_users.dto.UserRequestDTO;
-import com.beca.ms1_users.dto.UserResponseDTO;
 import com.beca.ms1_users.domain.UserNotFoundException;
-import com.beca.ms1_users.dto.UserUpdateRequestDTO;
 
 @Service
-public class RegisterUserService implements RegisterUserUseCase {
+public class RegisterUserService implements UserUseCase {
 
     private final UserRepositoryPort userRepositoryPort;
+    private final PasswordEncoder passwordEncoder;
 
-    public RegisterUserService(UserRepositoryPort userRepositoryPort) {
+    public RegisterUserService(
+            UserRepositoryPort userRepositoryPort,
+            PasswordEncoder passwordEncoder) {
         this.userRepositoryPort = userRepositoryPort;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
-    public UserResponseDTO registerUser(UserRequestDTO userRequestDTO) {
-        String email = userRequestDTO.getEmail()
+    public User registerUser(RegisterUserCommand command) {
+        String email = command.email()
                 .trim()
                 .toLowerCase(Locale.ROOT);
 
         if (userRepositoryPort.existsByEmail(email)) {
-            throw new IllegalArgumentException("Email ja cadastrado");
+            throw new EmailAlreadyExistsException("Email ja cadastrado");
         }
 
+        String senhaCriptografada = passwordEncoder.encode(
+                command.senha()
+        );
+
         User user = new User(
-                userRequestDTO.getNome(),
+                command.nome(),
                 email,
-                userRequestDTO.getSenha()
+                senhaCriptografada
         );
 
-        User savedUser = userRepositoryPort.save(user);
-
-        return new UserResponseDTO(
-                savedUser.getId(),
-                savedUser.getNome(),
-                savedUser.getEmail()
-        );
+        return userRepositoryPort.save(user);
     }
 
     @Override
-    public List<UserResponseDTO> findAllUsers() {
-        List<User> users = userRepositoryPort.findAll();
-        return users.stream()
-                .map(user -> new UserResponseDTO(
-                        user.getId(),
-                        user.getNome(),
-                        user.getEmail()
-                ))
-                .toList();
+    public List<User> findAllUsers() {
+        return userRepositoryPort.findAll();
     }
 
     @Override
-    public UserResponseDTO findUserById(UUID id) {
+    public User findUserById(UUID id) {
+        return userRepositoryPort.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(
+                        "Usuario nao encontrado"
+                ));
+    }
+
+    @Override
+    public User updateUser(UUID id, UpdateUserCommand command) {
         User user = userRepositoryPort.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new UserNotFoundException(
+                        "Usuario nao encontrado"
+                ));
 
-        return new UserResponseDTO(
-                user.getId(),
-                user.getNome(),
-                user.getEmail()
-        );
-    }
+        String email = command.email()
+                .trim()
+                .toLowerCase(Locale.ROOT);
 
-    @Override
-    public UserResponseDTO updateUser(UUID id, UserUpdateRequestDTO userUpdateRequestDTO) {
+        if (!user.getEmail().equalsIgnoreCase(email)
+                && userRepositoryPort.existsByEmail(email)) {
+            throw new EmailAlreadyExistsException("Email ja cadastrado");
+        }
 
-    User user = userRepositoryPort.findById(id)
-            .orElseThrow(() -> new UserNotFoundException("Usuario nao encontrado"));
+        user.atualizar(command.nome(), email);
 
-    String email = userUpdateRequestDTO.getEmail()
-            .trim()
-            .toLowerCase(Locale.ROOT);
-
-    if (!user.getEmail().equalsIgnoreCase(email)
-            && userRepositoryPort.existsByEmail(email)) {
-        throw new IllegalArgumentException("Email ja cadastrado");
-    }
-
-    user.atualizar(
-            userUpdateRequestDTO.getNome(),
-            email
-    );
-
-    User updatedUser = userRepositoryPort.save(user);
-
-    return new UserResponseDTO(
-            updatedUser.getId(),
-            updatedUser.getNome(),
-            updatedUser.getEmail()
-    );
+        return userRepositoryPort.save(user);
     }
 
     @Override
     public void deleteUser(UUID id) {
         User user = userRepositoryPort.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new UserNotFoundException(
+                        "Usuario nao encontrado"
+                ));
 
         userRepositoryPort.delete(user);
     }

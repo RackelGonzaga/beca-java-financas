@@ -1,3 +1,4 @@
+
 package com.beca.ms1_users.adapters.in;
 
 import java.util.List;
@@ -5,84 +6,91 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import com.beca.ms1_users.dto.UserUpdateRequestDTO;
-import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 
-import com.beca.ms1_users.application.port.in.RegisterUserUseCase;
+import com.beca.ms1_users.application.port.in.UserUseCase;
+import com.beca.ms1_users.application.port.in.RegisterUserCommand;
+import com.beca.ms1_users.application.port.in.UpdateUserCommand;
+import com.beca.ms1_users.domain.User;
 import com.beca.ms1_users.dto.UserRequestDTO;
 import com.beca.ms1_users.dto.UserResponseDTO;
-import com.beca.ms1_users.domain.UserNotFoundException;
+import com.beca.ms1_users.dto.UserUpdateRequestDTO;
 
 @RestController
 @RequestMapping("/users")
 public class UserController {
 
-    private final RegisterUserUseCase registerUserUseCase;
+    private final UserUseCase userUseCase;
 
-    public UserController(RegisterUserUseCase registerUserUseCase) {
-        this.registerUserUseCase = registerUserUseCase;
+    public UserController(UserUseCase userUseCase) {
+        this.userUseCase = userUseCase;
     }
 
     @PostMapping
-    public ResponseEntity<UserResponseDTO> registerUser(@Valid @RequestBody UserRequestDTO userRequestDTO) {
-        UserResponseDTO userResponseDTO = registerUserUseCase.registerUser(userRequestDTO);
-        return new ResponseEntity<>(userResponseDTO, HttpStatus.CREATED);
-    }
+    public ResponseEntity<UserResponseDTO> registerUser(
+            @Valid @RequestBody UserRequestDTO userRequestDTO) {
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<String> handleIllegalArgumentException(
-        IllegalArgumentException exception) {
+        RegisterUserCommand command = new RegisterUserCommand(
+                userRequestDTO.getNome(),
+                userRequestDTO.getEmail(),
+                userRequestDTO.getSenha()
+        );
 
-        return ResponseEntity
-            .status(HttpStatus.CONFLICT)
-            .body(exception.getMessage());
+        User user = userUseCase.registerUser(command);
+
+        return new ResponseEntity<>(toResponseDTO(user), HttpStatus.CREATED);
     }
 
     @GetMapping
     public ResponseEntity<List<UserResponseDTO>> findAllUsers() {
-        List<UserResponseDTO> users = registerUserUseCase.findAllUsers();
+
+        List<UserResponseDTO> users = userUseCase.findAllUsers()
+                .stream()
+                .map(this::toResponseDTO)
+                .toList();
+
         return new ResponseEntity<>(users, HttpStatus.OK);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UserResponseDTO> findUserById(@PathVariable UUID id) {
-        UserResponseDTO user = registerUserUseCase.findUserById(id);
-        return new ResponseEntity<>(user, HttpStatus.OK);
-    }
+    public ResponseEntity<UserResponseDTO> findUserById(
+            @PathVariable UUID id) {
 
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<String> handleUserNotFoundException(
-        UserNotFoundException exception) {
+        User user = userUseCase.findUserById(id);
 
-        return ResponseEntity
-            .status(HttpStatus.NOT_FOUND)
-            .body(exception.getMessage());
+        return new ResponseEntity<>(toResponseDTO(user), HttpStatus.OK);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<UserResponseDTO> updateUser(
-        @PathVariable UUID id,
-        @Valid @RequestBody UserUpdateRequestDTO userUpdateRequestDTO) {
+            @PathVariable UUID id,
+            @Valid @RequestBody UserUpdateRequestDTO userUpdateRequestDTO) {
 
-        UserResponseDTO user = registerUserUseCase.updateUser(id, userUpdateRequestDTO);
+        UpdateUserCommand command = new UpdateUserCommand(
+                userUpdateRequestDTO.getNome(),
+                userUpdateRequestDTO.getEmail()
+        );
 
-        return new ResponseEntity<>(user, HttpStatus.OK);
+        User user = userUseCase.updateUser(id, command);
+
+        return new ResponseEntity<>(toResponseDTO(user), HttpStatus.OK);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
-        registerUserUseCase.deleteUser(id);
+
+        userUseCase.deleteUser(id);
+
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
+    private UserResponseDTO toResponseDTO(User user) {
+        return new UserResponseDTO(
+                user.getId(),
+                user.getNome(),
+                user.getEmail()
+        );
+    }
 }

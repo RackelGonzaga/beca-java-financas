@@ -1,35 +1,23 @@
 package com.beca.ms1_users.domain;
 
 import java.util.UUID;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Table;
-import jakarta.persistence.Column;
 
-@Entity
-@Table(name = "users")
 public class User {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-
     private String nome;
-
-    @Column(nullable = false, unique = true)
     private String email;
-
     private String senha;
 
-    public User(String nome, String email, String senha) {
+    public User(UUID id, String nome, String email, String senha) {
+        this.id = id;
         this.nome = nome;
         this.email = email;
         this.senha = senha;
     }
 
-    protected User() {
+    public User(String nome, String email, String senha) {
+        this(null, nome, email, senha);
     }
 
     public UUID getId() {
@@ -52,5 +40,4 @@ public class User {
         this.nome = nome;
         this.email = email;
     }
-
 }
