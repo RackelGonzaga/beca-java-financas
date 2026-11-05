@@ -1,20 +1,29 @@
 
 package com.beca.ms1_users.application;
 
-import java.util.UUID;
-import java.util.Optional;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.Mock;
+
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
+
+import com.beca.ms1_users.application.port.in.ImportUsersCommand;
+import com.beca.ms1_users.application.port.in.ImportUsersResult;
 import com.beca.ms1_users.application.port.in.RegisterUserCommand;
 import com.beca.ms1_users.application.port.in.UpdateUserCommand;
 import com.beca.ms1_users.application.port.out.UserRepositoryPort;
@@ -26,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -36,17 +46,28 @@ class RegisterUserServiceTest {
     private UserRepositoryPort userRepositoryPort;
 
     private PasswordEncoder passwordEncoder;
+    private Validator validator;
+    private ValidatorFactory validatorFactory;
 
-    private RegisterUserService registerUserService;
+    private UserService registerUserService;
 
     @BeforeEach
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
 
-        registerUserService = new RegisterUserService(
+        validatorFactory = Validation.buildDefaultValidatorFactory();
+        validator = validatorFactory.getValidator();
+
+        registerUserService = new UserService(
                 userRepositoryPort,
-                passwordEncoder
+                passwordEncoder,
+                validator
         );
+    }
+
+    @AfterEach
+    void tearDown() {
+        validatorFactory.close();
     }
 
     @Test
@@ -66,7 +87,8 @@ class RegisterUserServiceTest {
 
         User response = registerUserService.registerUser(command);
 
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        ArgumentCaptor<User> userCaptor =
+                ArgumentCaptor.forClass(User.class);
 
         verify(userRepositoryPort).save(userCaptor.capture());
 
@@ -77,7 +99,10 @@ class RegisterUserServiceTest {
         assertEquals("maria@email.com", response.getEmail());
 
         assertNotEquals("123456", usuarioSalvo.getSenha());
-        assertTrue(passwordEncoder.matches("123456", usuarioSalvo.getSenha()));
+        assertTrue(passwordEncoder.matches(
+                "123456",
+                usuarioSalvo.getSenha()
+        ));
 
         verify(userRepositoryPort).existsByEmail("maria@email.com");
     }
@@ -322,5 +347,85 @@ class RegisterUserServiceTest {
         assertEquals("Usuario nao encontrado", exception.getMessage());
 
         verify(userRepositoryPort, never()).delete(any(User.class));
+    }
+
+    @Test
+    void deveImportarUsuarioDoCsvComSucesso() {
+
+        String csv = """
+                nome,email,senha
+                Maria Silva,maria@email.com,123456
+                """;
+
+        ImportUsersCommand command = new ImportUsersCommand(
+                csv.getBytes(StandardCharsets.UTF_8)
+        );
+
+        when(userRepositoryPort.existsByEmail("maria@email.com"))
+                .thenReturn(false);
+
+        when(userRepositoryPort.save(any(User.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ImportUsersResult resultado =
+                registerUserService.importUsers(command);
+
+        assertEquals(1, resultado.totalLinhas());
+        assertEquals(1, resultado.importados());
+        assertEquals(0, resultado.rejeitados());
+        assertTrue(resultado.erros().isEmpty());
+
+        ArgumentCaptor<User> userCaptor =
+                ArgumentCaptor.forClass(User.class);
+
+        verify(userRepositoryPort).save(userCaptor.capture());
+
+        User usuarioSalvo = userCaptor.getValue();
+
+        assertEquals("Maria Silva", usuarioSalvo.getNome());
+        assertEquals("maria@email.com", usuarioSalvo.getEmail());
+
+        assertNotEquals("123456", usuarioSalvo.getSenha());
+        assertTrue(passwordEncoder.matches(
+                "123456",
+                usuarioSalvo.getSenha()
+        ));
+    }
+
+    @Test
+    void deveRealizarImportacaoParcialQuandoExistiremLinhasInvalidas() {
+
+        String csv = """
+                nome,email,senha
+                Maria Silva,maria@email.com,123456
+                Maria Souza,maria@email.com,654321
+                Ana Souza,email-invalido,123456
+                Joao Silva,joao@email.com,123456
+                """;
+
+        ImportUsersCommand command = new ImportUsersCommand(
+                csv.getBytes(StandardCharsets.UTF_8)
+        );
+
+        when(userRepositoryPort.existsByEmail("maria@email.com"))
+                .thenReturn(false);
+
+        when(userRepositoryPort.existsByEmail("joao@email.com"))
+                .thenReturn(false);
+
+        when(userRepositoryPort.save(any(User.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ImportUsersResult resultado =
+                registerUserService.importUsers(command);
+
+        assertEquals(4, resultado.totalLinhas());
+        assertEquals(2, resultado.importados());
+        assertEquals(2, resultado.rejeitados());
+
+        assertEquals(3, resultado.erros().get(0).linha());
+        assertEquals(4, resultado.erros().get(1).linha());
+
+        verify(userRepositoryPort, times(2)).save(any(User.class));
     }
 }
