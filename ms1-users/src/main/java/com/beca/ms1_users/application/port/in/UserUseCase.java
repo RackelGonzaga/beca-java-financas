@@ -1,10 +1,12 @@
 package com.beca.ms1_users.application.port.in;
 
-import com.beca.ms1_users.domain.User;
 import java.util.List;
 import java.util.UUID;
 
+import com.beca.ms1_users.domain.User;
+
 public interface UserUseCase {
+
     User registerUser(RegisterUserCommand command);
 
     List<User> findAllUsers();
@@ -14,4 +16,6 @@ public interface UserUseCase {
     User updateUser(UUID id, UpdateUserCommand command);
 
     void deleteUser(UUID id);
+
+    ImportUsersResult importUsers(ImportUsersCommand command);
 }

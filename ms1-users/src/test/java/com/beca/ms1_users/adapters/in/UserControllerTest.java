@@ -1,4 +1,3 @@
-
 package com.beca.ms1_users.adapters.in;
 
 import java.util.List;

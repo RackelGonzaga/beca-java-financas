@@ -1,4 +1,3 @@
-
 package com.beca.ms1_users.adapters.out;
 
 import java.util.UUID;

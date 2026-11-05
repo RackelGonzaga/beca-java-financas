@@ -1,4 +1,3 @@
-
 package com.beca.ms1_users.adapters.in;
 
 import java.util.List;
@@ -61,6 +60,19 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(
+            IllegalArgumentException exception) {
+
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                exception.getMessage(),
+                List.of()
+        );
+
+        return ResponseEntity.badRequest().body(error);
     }
 
     public record ErrorResponse(
