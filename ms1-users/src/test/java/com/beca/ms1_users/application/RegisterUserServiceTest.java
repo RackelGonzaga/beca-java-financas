@@ -1,5 +1,6 @@
 package com.beca.ms1_users.application;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -458,5 +459,183 @@ class RegisterUserServiceTest {
         verify(userRepositoryPort).existsByEmail("erro@email.com");
         verify(userRepositoryPort).existsByEmail("ana@email.com");
         verify(userRepositoryPort).save(any(User.class));
+    }
+
+    @Test
+    void deveProcessarExatamenteMilRegistros() {
+
+        List<ImportUserRowCommand> usuarios = new ArrayList<>();
+
+        for (int i = 1; i <= 1000; i++) {
+            usuarios.add(new ImportUserRowCommand(
+                    i + 1,
+                    "Usuario " + i,
+                    "email-invalido",
+                    "123456"
+            ));
+        }
+
+        ImportUsersCommand command = new ImportUsersCommand(usuarios);
+
+        ImportUsersResult resultado = userService.importUsers(command);
+
+        assertEquals(1000, resultado.totalLinhas());
+        assertEquals(0, resultado.importados());
+        assertEquals(1000, resultado.rejeitados());
+
+        verify(userRepositoryPort, never()).save(any(User.class));
+    }
+
+    @Test
+    void deveRejeitarImportacaoComMaisDeMilRegistros() {
+
+        List<ImportUserRowCommand> usuarios = new ArrayList<>();
+
+        for (int i = 1; i <= 1001; i++) {
+            usuarios.add(new ImportUserRowCommand(
+                    i + 1,
+                    "Usuario " + i,
+                    "email-invalido",
+                    "123456"
+            ));
+        }
+
+        ImportUsersCommand command = new ImportUsersCommand(usuarios);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> userService.importUsers(command)
+        );
+
+        verify(userRepositoryPort, never()).save(any(User.class));
+    }
+
+    @Test
+    void deveRejeitarEmailDuplicadoNoMesmoArquivo() {
+
+        ImportUsersCommand command = new ImportUsersCommand(
+                List.of(
+                        new ImportUserRowCommand(
+                                2,
+                                "Maria Silva",
+                                "maria@email.com",
+                                "123456"
+                        ),
+                        new ImportUserRowCommand(
+                                3,
+                                "Maria Souza",
+                                "MARIA@EMAIL.COM",
+                                "654321"
+                        )
+                )
+        );
+
+        when(userRepositoryPort.existsByEmail("maria@email.com"))
+                .thenReturn(false);
+
+        when(userRepositoryPort.save(any(User.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ImportUsersResult resultado = userService.importUsers(command);
+
+        assertEquals(2, resultado.totalLinhas());
+        assertEquals(1, resultado.importados());
+        assertEquals(1, resultado.rejeitados());
+
+        assertEquals(3, resultado.erros().get(0).linha());
+        assertEquals(
+                "Email duplicado no arquivo",
+                resultado.erros().get(0).motivo()
+        );
+
+        verify(userRepositoryPort, times(1))
+                .existsByEmail("maria@email.com");
+
+        verify(userRepositoryPort, times(1))
+                .save(any(User.class));
+    }
+
+    @Test
+    void deveRejeitarEmailQueJaExisteNoBanco() {
+
+        ImportUsersCommand command = new ImportUsersCommand(
+                List.of(
+                        new ImportUserRowCommand(
+                                2,
+                                "Maria Silva",
+                                "maria@email.com",
+                                "123456"
+                        )
+                )
+        );
+
+        when(userRepositoryPort.existsByEmail("maria@email.com"))
+                .thenReturn(true);
+
+        ImportUsersResult resultado = userService.importUsers(command);
+
+        assertEquals(1, resultado.totalLinhas());
+        assertEquals(0, resultado.importados());
+        assertEquals(1, resultado.rejeitados());
+
+        assertEquals(2, resultado.erros().get(0).linha());
+        assertEquals(
+                "Email já cadastrado no sistema",
+                resultado.erros().get(0).motivo()
+        );
+
+        verify(userRepositoryPort)
+                .existsByEmail("maria@email.com");
+
+        verify(userRepositoryPort, never()).save(any(User.class));
+    }
+
+    @Test
+    void deveContinuarImportacaoQuandoExistirRegistroNulo() {
+
+        List<ImportUserRowCommand> usuarios = new ArrayList<>();
+
+        usuarios.add(new ImportUserRowCommand(
+                2,
+                "Maria Silva",
+                "maria@email.com",
+                "123456"
+        ));
+
+        usuarios.add(null);
+
+        usuarios.add(new ImportUserRowCommand(
+                4,
+                "Ana Souza",
+                "ana@email.com",
+                "123456"
+        ));
+
+        ImportUsersCommand command = new ImportUsersCommand(usuarios);
+
+        when(userRepositoryPort.existsByEmail("maria@email.com"))
+                .thenReturn(false);
+
+        when(userRepositoryPort.existsByEmail("ana@email.com"))
+                .thenReturn(false);
+
+        when(userRepositoryPort.save(any(User.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ImportUsersResult resultado = userService.importUsers(command);
+
+        assertEquals(3, resultado.totalLinhas());
+        assertEquals(2, resultado.importados());
+        assertEquals(1, resultado.rejeitados());
+
+        assertEquals(3, resultado.erros().get(0).linha());
+
+        assertEquals(
+                "Erro ao processar esta linha",
+                resultado.erros().get(0).motivo()
+        );
+
+        verify(userRepositoryPort, times(2))
+                .save(any(User.class));
     }
 }

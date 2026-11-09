@@ -134,17 +134,21 @@ public class UserService implements UserUseCase {
 
         int importados = 0;
 
-        for (ImportUserRowCommand usuario : usuarios) {
+        for (int i = 0; i < usuarios.size(); i++) {
 
-            if (usuario == null) {
-                throw new IllegalArgumentException(
-                        "A lista contém um registro nulo"
-                );
-            }
+            ImportUserRowCommand usuario = usuarios.get(i);
 
-            int numeroLinha = usuario.numeroLinha();
+            int numeroLinha = usuario == null
+                    ? i + 2
+                    : usuario.numeroLinha();
 
             try {
+
+                if (usuario == null) {
+                    throw new IllegalArgumentException(
+                            "Registro inválido"
+                    );
+                }
 
                 RegisterUserCommand registerCommand =
                         new RegisterUserCommand(
