@@ -2,10 +2,12 @@ package com.beca.ms1_users.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 public class UserRequestDTO {
 
     @NotBlank
+    @Size(max = 255, message = "Nome deve ter no máximo 255 caracteres")
     private String nome;
 
     @NotBlank

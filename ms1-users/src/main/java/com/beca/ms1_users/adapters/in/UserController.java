@@ -2,6 +2,7 @@ package com.beca.ms1_users.adapters.in;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -35,9 +36,14 @@ import jakarta.validation.Valid;
 public class UserController {
 
     private final UserUseCase userUseCase;
+    private final UserCsvParser userCsvParser;
 
-    public UserController(UserUseCase userUseCase) {
+    public UserController(
+            UserUseCase userUseCase,
+            UserCsvParser userCsvParser) {
+
         this.userUseCase = userUseCase;
+        this.userCsvParser = userCsvParser;
     }
 
     @PostMapping
@@ -117,7 +123,7 @@ public class UserController {
         String filename = file.getOriginalFilename();
 
         if (filename == null
-                || !filename.toLowerCase().endsWith(".csv")) {
+                || !filename.toLowerCase(Locale.ROOT).endsWith(".csv")) {
 
             throw new IllegalArgumentException(
                     "O arquivo precisa estar no formato CSV"
@@ -125,17 +131,18 @@ public class UserController {
         }
 
         try {
+            var usuarios = userCsvParser.parse(file.getBytes());
 
             ImportUsersCommand command = new ImportUsersCommand(
-                    file.getBytes()
+                    usuarios
             );
 
-            ImportUsersResult result = userUseCase.importUsers(command);
+            ImportUsersResult result =
+                    userUseCase.importUsers(command);
 
             return ResponseEntity.ok(result);
 
         } catch (IOException exception) {
-
             throw new IllegalArgumentException(
                     "Não foi possível ler o arquivo CSV",
                     exception

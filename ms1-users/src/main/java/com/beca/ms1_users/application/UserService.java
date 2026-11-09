@@ -1,10 +1,5 @@
 package com.beca.ms1_users.application;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -12,12 +7,11 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.beca.ms1_users.application.port.in.ImportUserRowCommand;
 import com.beca.ms1_users.application.port.in.ImportUsersCommand;
 import com.beca.ms1_users.application.port.in.ImportUsersResult;
 import com.beca.ms1_users.application.port.in.RegisterUserCommand;
@@ -32,6 +26,8 @@ import jakarta.validation.Validator;
 
 @Service
 public class UserService implements UserUseCase {
+
+    private static final int MAX_LINHAS = 1000;
 
     private final UserRepositoryPort userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -58,7 +54,8 @@ public class UserService implements UserUseCase {
             );
         }
 
-        String senhaCriptografada = passwordEncoder.encode(command.senha());
+        String senhaCriptografada =
+                passwordEncoder.encode(command.senha());
 
         User user = new User(
                 command.nome().trim(),
@@ -90,7 +87,8 @@ public class UserService implements UserUseCase {
 
         String email = normalizeEmail(command.email());
 
-        boolean emailAlterado = !user.getEmail().equals(email);
+        boolean emailAlterado =
+                !user.getEmail().equals(email);
 
         if (emailAlterado && userRepository.existsByEmail(email)) {
             throw new EmailAlreadyExistsException(
@@ -98,10 +96,7 @@ public class UserService implements UserUseCase {
             );
         }
 
-        user.atualizar(
-                command.nome().trim(),
-                email
-        );
+        user.atualizar(command.nome().trim(), email);
 
         return userRepository.save(user);
     }
@@ -117,66 +112,46 @@ public class UserService implements UserUseCase {
     @Override
     public ImportUsersResult importUsers(ImportUsersCommand command) {
 
-        List<ImportUsersResult.ImportError> erros = new ArrayList<>();
-        Set<String> emailsNoArquivo = new HashSet<>();
-
-        int totalLinhas = 0;
-        int importados = 0;
-
-        byte[] content = command.content();
-
-        if (content == null || content.length == 0) {
+        if (command == null || command.usuarios() == null) {
             throw new IllegalArgumentException(
-                    "O arquivo CSV está vazio"
+                    "A lista de usuários não pode ser nula"
             );
         }
 
-        CSVFormat format = CSVFormat.DEFAULT.builder()
-                .setHeader()
-                .setSkipHeaderRecord(true)
-                .setTrim(true)
-                .get();
+        List<ImportUserRowCommand> usuarios = command.usuarios();
 
-        try (
-                Reader reader = new InputStreamReader(
-                        new ByteArrayInputStream(content),
-                        StandardCharsets.UTF_8
-                );
-                CSVParser parser = format.parse(reader)
-        ) {
+        if (usuarios.size() > MAX_LINHAS) {
+            throw new IllegalArgumentException(
+                    "O arquivo CSV não pode conter mais de "
+                            + MAX_LINHAS + " registros"
+            );
+        }
 
-            Set<String> headers = parser.getHeaderMap().keySet();
+        List<ImportUsersResult.ImportError> erros =
+                new ArrayList<>();
 
-            if (!headers.containsAll(
-                    Set.of("nome", "email", "senha")
-            )) {
+        Set<String> emailsNoArquivo = new HashSet<>();
+
+        int importados = 0;
+
+        for (ImportUserRowCommand usuario : usuarios) {
+
+            if (usuario == null) {
                 throw new IllegalArgumentException(
-                        "O CSV precisa conter as colunas: nome, email e senha"
+                        "A lista contém um registro nulo"
                 );
             }
 
-            for (CSVRecord record : parser) {
+            int numeroLinha = usuario.numeroLinha();
 
-                totalLinhas++;
-
-                int numeroLinha = (int) record.getRecordNumber() + 1;
-
-                if (!record.isConsistent()) {
-
-                    erros.add(new ImportUsersResult.ImportError(
-                            numeroLinha,
-                            "Quantidade de colunas inválida"
-                    ));
-
-                    continue;
-                }
-
-                String nome = record.get("nome");
-                String email = normalizeEmail(record.get("email"));
-                String senha = record.get("senha");
+            try {
 
                 RegisterUserCommand registerCommand =
-                        new RegisterUserCommand(nome, email, senha);
+                        new RegisterUserCommand(
+                                usuario.nome(),
+                                usuario.email(),
+                                usuario.senha()
+                        );
 
                 var violations = validator.validate(registerCommand);
 
@@ -196,6 +171,8 @@ public class UserService implements UserUseCase {
                     continue;
                 }
 
+                String email = normalizeEmail(usuario.email());
+
                 if (!emailsNoArquivo.add(email)) {
 
                     erros.add(new ImportUsersResult.ImportError(
@@ -206,30 +183,42 @@ public class UserService implements UserUseCase {
                     continue;
                 }
 
-                try {
+                RegisterUserCommand comandoNormalizado =
+                        new RegisterUserCommand(
+                                usuario.nome(),
+                                email,
+                                usuario.senha()
+                        );
 
-                    registerUser(registerCommand);
-                    importados++;
+                registerUser(comandoNormalizado);
 
-                } catch (EmailAlreadyExistsException exception) {
+                importados++;
 
-                    erros.add(new ImportUsersResult.ImportError(
-                            numeroLinha,
-                            "Email já cadastrado no sistema"
-                    ));
-                }
+            } catch (EmailAlreadyExistsException exception) {
+
+                erros.add(new ImportUsersResult.ImportError(
+                        numeroLinha,
+                        "Email já cadastrado no sistema"
+                ));
+
+            } catch (DataIntegrityViolationException exception) {
+
+                erros.add(new ImportUsersResult.ImportError(
+                        numeroLinha,
+                        "Os dados desta linha violam uma restrição do sistema"
+                ));
+
+            } catch (Exception exception) {
+
+                erros.add(new ImportUsersResult.ImportError(
+                        numeroLinha,
+                        "Erro ao processar esta linha"
+                ));
             }
-
-        } catch (IOException exception) {
-
-            throw new IllegalArgumentException(
-                    "Não foi possível processar o arquivo CSV",
-                    exception
-            );
         }
 
         return new ImportUsersResult(
-                totalLinhas,
+                usuarios.size(),
                 importados,
                 erros.size(),
                 erros

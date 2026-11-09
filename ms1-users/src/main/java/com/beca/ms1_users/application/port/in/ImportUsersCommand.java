@@ -1,5 +1,8 @@
 package com.beca.ms1_users.application.port.in;
 
-public record ImportUsersCommand (byte[] content) {
-    
+import java.util.List;
+
+public record ImportUsersCommand(
+        List<ImportUserRowCommand> usuarios
+) {
 }
