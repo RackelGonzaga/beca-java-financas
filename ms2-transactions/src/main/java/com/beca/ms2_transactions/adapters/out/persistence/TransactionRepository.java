@@ -5,6 +5,10 @@ import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface TransactionRepository extends JpaRepository<TransactionEntity, UUID> {
+public interface TransactionRepository
+        extends JpaRepository<TransactionEntity, UUID> {
+
     List<TransactionEntity> findByUserId(UUID userId);
+
+    List<TransactionEntity> findByDestination(UUID destination);
 }

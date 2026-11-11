@@ -1,19 +1,18 @@
 package com.beca.ms2_transactions.application.port.out;
 
 import java.util.List;
-import java.util.UUID;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.beca.ms2_transactions.domain.Transaction;
 
 public interface TransactionRepositoryPort {
 
     Transaction save(Transaction transaction);
-    
+
     List<Transaction> findByUserId(UUID userId);
 
-    Optional<Transaction> findById(UUID id);
+    List<Transaction> findByDestination(UUID destination);
 
-    void deleteById(UUID id);
-    
+    Optional<Transaction> findById(UUID id);
 }

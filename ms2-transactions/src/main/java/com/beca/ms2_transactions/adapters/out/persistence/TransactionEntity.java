@@ -7,7 +7,7 @@ import java.util.UUID;
 
 import jakarta.persistence.*;
 
-import com.beca.ms2_transactions.domain.Transaction;
+import com.beca.ms2_transactions.domain.TransactionStatus;
 import com.beca.ms2_transactions.domain.TransactionType;
 
 @Entity
@@ -25,6 +25,13 @@ public class TransactionEntity {
     @Column(nullable = false)
     private TransactionType type;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TransactionStatus status;
+
+    @Column
+    private String rejectionReason;
+
     @Column(nullable = false)
     private String description;
 
@@ -38,7 +45,8 @@ public class TransactionEntity {
     private LocalDateTime createdAt;
 
     private String origin;
-    private String destination;
+
+    private UUID destination;
 
     protected TransactionEntity() {}
 
@@ -52,28 +60,23 @@ public class TransactionEntity {
     public TransactionEntity(
             UUID userId,
             TransactionType type,
+            TransactionStatus status,
+            String rejectionReason,
             String description,
             BigDecimal amount,
             LocalDate date,
             String origin,
-            String destination) {
+            UUID destination) {
 
         this.userId = userId;
         this.type = type;
+        this.status = status;
+        this.rejectionReason = rejectionReason;
         this.description = description;
         this.amount = amount;
         this.date = date;
         this.origin = origin;
         this.destination = destination;
-    }
-
-    public void update(Transaction transaction) {
-        this.type = transaction.getType();
-        this.description = transaction.getDescription();
-        this.amount = transaction.getAmount();
-        this.date = transaction.getDate();
-        this.origin = transaction.getOrigin();
-        this.destination = transaction.getDestination();
     }
 
     public UUID getId() {
@@ -86,6 +89,14 @@ public class TransactionEntity {
 
     public TransactionType getType() {
         return type;
+    }
+
+    public TransactionStatus getStatus() {
+        return status;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
     }
 
     public String getDescription() {
@@ -104,7 +115,7 @@ public class TransactionEntity {
         return origin;
     }
 
-    public String getDestination() {
+    public UUID getDestination() {
         return destination;
     }
 
