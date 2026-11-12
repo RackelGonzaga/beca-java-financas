@@ -1,9 +1,11 @@
 package com.beca.ms2_transactions.domain;
 
+
 import java.math.BigDecimal;
 import java.util.Optional;
 
 public record AccountBalance(
+        String accountId,
         BigDecimal saldo,
         BigDecimal limiteDiario,
         BigDecimal limitePorTransacao) {
@@ -22,6 +24,14 @@ public record AccountBalance(
         }
     }
 
+    // Compatibilidade com os testes e usos anteriores.
+    public AccountBalance(
+            BigDecimal saldo,
+            BigDecimal limiteDiario,
+            BigDecimal limitePorTransacao) {
+        this(null, saldo, limiteDiario, limitePorTransacao);
+    }
+
     public Optional<String> validarSaida(
             BigDecimal valor,
             BigDecimal totalGastoHoje) {
@@ -32,8 +42,7 @@ public record AccountBalance(
 
         if (totalGastoHoje == null
                 || totalGastoHoje.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException(
-                    "O total gasto hoje é inválido.");
+            throw new IllegalArgumentException("O total gasto hoje é inválido.");
         }
 
         if (valor.compareTo(saldo) > 0) {
@@ -49,5 +58,27 @@ public record AccountBalance(
         }
 
         return Optional.empty();
+    }
+
+    public AccountBalance saldoApos(
+            TransactionType tipo,
+            BigDecimal valor) {
+
+        if (tipo == null || valor == null
+                || valor.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Tipo e valor da operação são obrigatórios.");
+        }
+
+        BigDecimal novoSaldo = switch (tipo) {
+            case DEPOSIT -> saldo.add(valor);
+            case WITHDRAWAL, PURCHASE, TRANSFER -> saldo.subtract(valor);
+        };
+
+        if (novoSaldo.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("O saldo não pode ficar negativo.");
+        }
+
+        return new AccountBalance(
+                accountId, novoSaldo, limiteDiario, limitePorTransacao);
     }
 }

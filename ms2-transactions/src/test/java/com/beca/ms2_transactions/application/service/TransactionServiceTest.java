@@ -66,8 +66,13 @@ class TransactionServiceTest {
         Transaction transaction = criarTransacao(
                 TransactionType.DEPOSIT, userId, null, "100.00");
 
+        AccountBalance balance = contaComSaldo();
+
         when(userValidationPort.validateUserExists(userId))
                 .thenReturn(criarUsuario(userId));
+
+        when(accountBalancePort.findByEmail("usuario@email.com"))
+                .thenReturn(Optional.of(balance));
 
         when(transactionRepository.save(transaction))
                 .thenReturn(transaction);
@@ -77,9 +82,11 @@ class TransactionServiceTest {
         assertSame(transaction, result);
 
         verify(userValidationPort).validateUserExists(userId);
+        verify(accountBalancePort).findByEmail("usuario@email.com");
+        verify(accountBalancePort).updateBalance(
+                balance, new BigDecimal("1100.00"));
         verify(transactionRepository).save(transaction);
-        verify(transactionRepository, never()).lockUserTransactions(userId);
-        verify(accountBalancePort, never()).findByEmail(any());
+        verify(transactionRepository).lockUserTransactions(userId);
     }
 
     @Test
@@ -106,6 +113,9 @@ class TransactionServiceTest {
         Transaction transaction = criarTransacao(
                 TransactionType.TRANSFER, userId, destinationId, "50.00");
 
+        AccountBalance origem = contaComSaldo();
+        AccountBalance destino = contaComSaldo();
+
         when(userValidationPort.validateUserExists(userId))
                 .thenReturn(criarUsuario(userId));
 
@@ -113,7 +123,10 @@ class TransactionServiceTest {
                 .thenReturn(criarUsuario(destinationId));
 
         when(accountBalancePort.findByEmail("usuario@email.com"))
-                .thenReturn(Optional.of(contaComSaldo()));
+                .thenReturn(Optional.of(origem));
+
+        when(accountBalancePort.findByEmail("destino@email.com"))
+                .thenReturn(Optional.of(destino));
 
         when(transactionRepository.sumApprovedOutflowsByUserAndDate(
                 any(UUID.class), any(LocalDate.class)))
@@ -128,7 +141,15 @@ class TransactionServiceTest {
 
         verify(userValidationPort).validateUserExists(userId);
         verify(userValidationPort).validateUserExists(destinationId);
+
+        verify(accountBalancePort).updateBalance(
+                origem, new BigDecimal("950.00"));
+
+        verify(accountBalancePort).updateBalance(
+                destino, new BigDecimal("1050.00"));
+
         verify(transactionRepository).lockUserTransactions(userId);
+        verify(transactionRepository).lockUserTransactions(destinationId);
         verify(transactionRepository).save(transaction);
     }
 
@@ -152,7 +173,6 @@ class TransactionServiceTest {
                 result.getRejectionReason());
 
         verify(userValidationPort).validateUserExists(userId);
-        verify(userValidationPort, never()).validateUserExists(destinationId);
         verify(transactionRepository, never()).lockUserTransactions(userId);
     }
 
@@ -186,6 +206,7 @@ class TransactionServiceTest {
 
         verify(transactionRepository).lockUserTransactions(userId);
         verify(transactionRepository).save(any(Transaction.class));
+        verify(accountBalancePort, never()).updateBalance(any(), any());
     }
 
     @Test
@@ -207,7 +228,7 @@ class TransactionServiceTest {
 
         assertEquals(TransactionStatus.REJECTED, result.getStatus());
         assertEquals(
-                "Conta não encontrada no serviço de saldo.",
+                "Conta de origem não encontrada na MockAPI.",
                 result.getRejectionReason());
 
         verify(transactionRepository).lockUserTransactions(userId);
@@ -301,7 +322,11 @@ class TransactionServiceTest {
     }
 
     private UserInfo criarUsuario(UUID id) {
-        return new UserInfo(id, "Usuário de teste", "usuario@email.com");
+        String email = id.equals(userId)
+                ? "usuario@email.com"
+                : "destino@email.com";
+
+        return new UserInfo(id, "Usuário de teste", email);
     }
 
     private AccountBalance contaComSaldo() {

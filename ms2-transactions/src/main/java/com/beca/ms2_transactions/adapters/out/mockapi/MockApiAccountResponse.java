@@ -10,4 +10,14 @@ public record MockApiAccountResponse(
         BigDecimal limitePorTransacao,
         String email
 ) {
+
+    public MockApiAccountResponse withSaldo(BigDecimal novoSaldo) {
+        return new MockApiAccountResponse(
+                id,
+                userId,
+                novoSaldo,
+                limiteDiario,
+                limitePorTransacao,
+                email);
+    }
 }
