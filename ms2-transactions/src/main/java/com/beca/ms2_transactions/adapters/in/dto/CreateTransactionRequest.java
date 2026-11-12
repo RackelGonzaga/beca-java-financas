@@ -10,40 +10,39 @@ import jakarta.validation.constraints.Positive;
 
 import com.beca.ms2_transactions.domain.Transaction;
 import com.beca.ms2_transactions.domain.TransactionType;
+import com.beca.ms2_transactions.domain.Category;
 
-public record CreateTransactionRequest (
+public record CreateTransactionRequest(
+        @NotNull
+        TransactionType type,
 
-    @NotNull
-    UUID userId,
+        @NotNull
+        Category category,
 
-    @NotNull
-    TransactionType type,
+        @NotBlank
+        String description,
 
-    @NotBlank
-    String description,
+        @NotNull
+        @Positive
+        BigDecimal amount,
 
-    @NotNull
-    @Positive
-    BigDecimal amount,
+        @NotNull
+        LocalDate date,
 
-    @NotNull
-    LocalDate date,
+        String origin,
 
-    String origin,
-
-    UUID destination
-
+        UUID destination
 ) {
-    public Transaction toDomain() {
+    public Transaction toDomain(UUID userId) {
         return new Transaction(
-            userId,
-            type,
-            description,
-            amount,
-            date,
-            origin,
-            destination
-
+                userId,
+                type,
+                category,
+                description,
+                amount,
+                date,
+                origin,
+                destination
         );
     }
 }

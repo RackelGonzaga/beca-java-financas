@@ -11,6 +11,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.beca.ms1_users.application.port.in.AuthenticateUserCommand;
 import com.beca.ms1_users.application.port.in.ImportUserRowCommand;
 import com.beca.ms1_users.application.port.in.ImportUsersCommand;
 import com.beca.ms1_users.application.port.in.ImportUsersResult;
@@ -19,6 +20,7 @@ import com.beca.ms1_users.application.port.in.UpdateUserCommand;
 import com.beca.ms1_users.application.port.in.UserUseCase;
 import com.beca.ms1_users.application.port.out.UserRepositoryPort;
 import com.beca.ms1_users.domain.EmailAlreadyExistsException;
+import com.beca.ms1_users.domain.InvalidCredentialsException;
 import com.beca.ms1_users.domain.User;
 import com.beca.ms1_users.domain.UserNotFoundException;
 
@@ -64,6 +66,26 @@ public class UserService implements UserUseCase {
         );
 
         return userRepository.save(user);
+    }
+
+    @Override
+    public User authenticateUser(AuthenticateUserCommand command) {
+
+        String email = normalizeEmail(command.email());
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(InvalidCredentialsException::new);
+
+        boolean senhaValida = passwordEncoder.matches(
+                command.senha(),
+                user.getSenha()
+        );
+
+        if (!senhaValida) {
+            throw new InvalidCredentialsException();
+        }
+
+        return user;
     }
 
     @Override

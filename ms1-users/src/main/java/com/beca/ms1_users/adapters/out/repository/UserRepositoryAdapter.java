@@ -106,4 +106,10 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
     public void delete(User user) {
         userRepository.deleteById(user.getId());
     }
+
+    @Override
+    public Optional<User> findByEmail(String email) {
+        return userRepository.findByEmailIgnoreCase(email)
+            .map(entity -> entity.toDomain());
+    }
 }

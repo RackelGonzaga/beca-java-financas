@@ -4,5 +4,5 @@ import java.util.UUID;
 
 public interface UserValidationPort {
 
-    void validateUserExists(UUID userId);
+    UserInfo validateUserExists(UUID userId);
 }

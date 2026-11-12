@@ -2,6 +2,7 @@ package com.beca.ms2_transactions.adapters.out.persistence;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
@@ -10,6 +11,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,12 +25,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.beca.ms2_transactions.domain.Transaction;
 import com.beca.ms2_transactions.domain.TransactionStatus;
 import com.beca.ms2_transactions.domain.TransactionType;
+import com.beca.ms2_transactions.domain.Category;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionPersistenceAdapterTest {
 
     @Mock
     private TransactionRepository transactionRepository;
+
+    @Mock
+    private EntityManager entityManager;
+
+    @Mock
+    private Query query;
 
     @InjectMocks
     private TransactionPersistenceAdapter adapter;
@@ -45,6 +56,7 @@ class TransactionPersistenceAdapterTest {
         Transaction transaction = new Transaction(
                 userId,
                 TransactionType.DEPOSIT,
+                Category.OUTROS,
                 "Depósito inicial",
                 new BigDecimal("100.00"),
                 date,
@@ -63,6 +75,7 @@ class TransactionPersistenceAdapterTest {
         assertNotNull(saved.getId());
         assertEquals(userId, saved.getUserId());
         assertEquals(TransactionType.DEPOSIT, saved.getType());
+        assertEquals(Category.OUTROS, saved.getCategory());
         assertEquals(TransactionStatus.APPROVED, saved.getStatus());
         assertEquals(new BigDecimal("100.00"), saved.getAmount());
         assertNotNull(saved.getCreatedAt());
@@ -75,6 +88,7 @@ class TransactionPersistenceAdapterTest {
         Transaction transaction = new Transaction(
                 userId,
                 TransactionType.WITHDRAWAL,
+                Category.OUTROS,
                 "Saque",
                 new BigDecimal("500.00"),
                 date,
@@ -102,24 +116,34 @@ class TransactionPersistenceAdapterTest {
     }
 
     @Test
-    void deveBuscarTransacoesPorUsuario() {
+    void deveBuscarTransacoesPorFiltros() {
         TransactionEntity entity = criarEntity(
                 UUID.randomUUID(),
                 TransactionStatus.APPROVED,
                 null
         );
 
-        when(transactionRepository.findByUserId(userId))
+        when(transactionRepository.findByFilters(
+                userId, date, date, TransactionType.DEPOSIT))
                 .thenReturn(List.of(entity));
 
-        List<Transaction> transactions = adapter.findByUserId(userId);
+        List<Transaction> transactions = adapter.findByFilters(
+                userId,
+                date,
+                date,
+                TransactionType.DEPOSIT
+        );
 
         assertEquals(1, transactions.size());
         assertEquals(userId, transactions.get(0).getUserId());
-        assertEquals(TransactionStatus.APPROVED,
-                transactions.get(0).getStatus());
+        assertEquals(
+                TransactionStatus.APPROVED,
+                transactions.get(0).getStatus()
+        );
 
-        verify(transactionRepository).findByUserId(userId);
+        verify(transactionRepository).findByFilters(
+                userId, date, date, TransactionType.DEPOSIT
+        );
     }
 
     @Test
@@ -139,10 +163,11 @@ class TransactionPersistenceAdapterTest {
 
         assertTrue(result.isPresent());
         assertEquals(transactionId, result.get().getId());
-        assertEquals(TransactionStatus.REJECTED,
-                result.get().getStatus());
-        assertEquals("Saldo insuficiente",
-                result.get().getRejectionReason());
+        assertEquals(TransactionStatus.REJECTED, result.get().getStatus());
+        assertEquals(
+                "Saldo insuficiente",
+                result.get().getRejectionReason()
+        );
 
         verify(transactionRepository).findById(transactionId);
     }
@@ -161,6 +186,21 @@ class TransactionPersistenceAdapterTest {
         verify(transactionRepository).findById(transactionId);
     }
 
+    @Test
+    void deveBloquearOperacoesDoUsuario() {
+        when(entityManager.createNativeQuery(anyString()))
+                .thenReturn(query);
+
+        when(query.setParameter("userId", userId.toString()))
+                .thenReturn(query);
+
+        adapter.lockUserTransactions(userId);
+
+        verify(entityManager).createNativeQuery(anyString());
+        verify(query).setParameter("userId", userId.toString());
+        verify(query).getSingleResult();
+    }
+
     private TransactionEntity criarEntity(
             UUID id,
             TransactionStatus status,
@@ -171,6 +211,7 @@ class TransactionPersistenceAdapterTest {
         when(entity.getId()).thenReturn(id);
         when(entity.getUserId()).thenReturn(userId);
         when(entity.getType()).thenReturn(TransactionType.DEPOSIT);
+        when(entity.getCategory()).thenReturn(Category.OUTROS);
         when(entity.getStatus()).thenReturn(status);
         when(entity.getRejectionReason()).thenReturn(rejectionReason);
         when(entity.getDescription()).thenReturn("Depósito");

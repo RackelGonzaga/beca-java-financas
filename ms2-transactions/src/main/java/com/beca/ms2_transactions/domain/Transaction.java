@@ -11,6 +11,7 @@ public class Transaction {
     private UUID id;
     private UUID userId;
     private TransactionType type;
+    private Category category;
     private TransactionStatus status;
     private String rejectionReason;
     private String description;
@@ -21,16 +22,16 @@ public class Transaction {
     private LocalDateTime createdAt;
 
     // Construtor para criar uma nova transação aprovada
-    public Transaction(UUID userId, TransactionType type,
+    public Transaction(UUID userId, TransactionType type, Category category,
             String description, BigDecimal amount, LocalDate date,
             String origin, UUID destination) {
 
-        this(userId, type, description, amount, date,
+        this(userId, type, category, description, amount, date,
                 origin, destination, TransactionStatus.APPROVED, null);
     }
 
     // Construtor para criar uma transação com status definido
-    public Transaction(UUID userId, TransactionType type,
+    public Transaction(UUID userId, TransactionType type, Category category,
             String description, BigDecimal amount, LocalDate date,
             String origin, UUID destination,
             TransactionStatus status, String rejectionReason) {
@@ -47,8 +48,14 @@ public class Transaction {
             validarTransferencia(userId, type, destination);
         }
 
+        if (category == null) {
+            throw new IllegalArgumentException(
+                    "A categoria da transação é obrigatória.");
+        }
+
         this.userId = userId;
         this.type = type;
+        this.category = category;
         this.status = status;
         this.rejectionReason = rejectionReason;
         this.description = description;
@@ -59,12 +66,12 @@ public class Transaction {
     }
 
     // Construtor para reconstruir uma transação existente
-    public Transaction(UUID id, UUID userId, TransactionType type,
+    public Transaction(UUID id, UUID userId, TransactionType type, Category category,
             String description, BigDecimal amount, LocalDate date,
             String origin, UUID destination, LocalDateTime createdAt,
             TransactionStatus status, String rejectionReason) {
 
-        this(userId, type, description, amount, date,
+        this(userId, type, category, description, amount, date,
                 origin, destination, status, rejectionReason);
 
         this.id = id;
@@ -77,6 +84,10 @@ public class Transaction {
 
     public UUID getUserId() {
         return userId;
+    }
+
+    public Category getCategory() {
+        return category;
     }
 
     public TransactionType getType() {

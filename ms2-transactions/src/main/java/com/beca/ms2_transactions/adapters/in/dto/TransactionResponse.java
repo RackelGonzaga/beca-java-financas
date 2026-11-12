@@ -8,11 +8,13 @@ import java.util.UUID;
 import com.beca.ms2_transactions.domain.Transaction;
 import com.beca.ms2_transactions.domain.TransactionStatus;
 import com.beca.ms2_transactions.domain.TransactionType;
+import com.beca.ms2_transactions.domain.Category;
 
 public record TransactionResponse(
         UUID id,
         UUID userId,
         TransactionType type,
+        Category category,
         TransactionStatus status,
         String rejectionReason,
         String description,
@@ -27,6 +29,7 @@ public record TransactionResponse(
                 transaction.getId(),
                 transaction.getUserId(),
                 transaction.getType(),
+                transaction.getCategory(),
                 transaction.getStatus(),
                 transaction.getRejectionReason(),
                 transaction.getDescription(),

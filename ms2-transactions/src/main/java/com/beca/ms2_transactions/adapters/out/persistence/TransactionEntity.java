@@ -9,6 +9,7 @@ import jakarta.persistence.*;
 
 import com.beca.ms2_transactions.domain.TransactionStatus;
 import com.beca.ms2_transactions.domain.TransactionType;
+import com.beca.ms2_transactions.domain.Category;
 
 @Entity
 @Table(name = "transactions")
@@ -44,11 +45,16 @@ public class TransactionEntity {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Category category;
+
     private String origin;
 
     private UUID destination;
 
-    protected TransactionEntity() {}
+    protected TransactionEntity() {
+    }
 
     @PrePersist
     protected void onCreate() {
@@ -60,6 +66,7 @@ public class TransactionEntity {
     public TransactionEntity(
             UUID userId,
             TransactionType type,
+            Category category,
             TransactionStatus status,
             String rejectionReason,
             String description,
@@ -70,6 +77,7 @@ public class TransactionEntity {
 
         this.userId = userId;
         this.type = type;
+        this.category = category;
         this.status = status;
         this.rejectionReason = rejectionReason;
         this.description = description;
@@ -89,6 +97,10 @@ public class TransactionEntity {
 
     public TransactionType getType() {
         return type;
+    }
+
+    public Category getCategory() {
+        return category;
     }
 
     public TransactionStatus getStatus() {

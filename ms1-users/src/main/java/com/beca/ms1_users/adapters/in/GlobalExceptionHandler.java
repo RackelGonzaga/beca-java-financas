@@ -10,79 +10,89 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.beca.ms1_users.domain.EmailAlreadyExistsException;
 import com.beca.ms1_users.domain.UserNotFoundException;
+import com.beca.ms1_users.domain.InvalidCredentialsException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(EmailAlreadyExistsException.class)
-    public ResponseEntity<ErrorResponse> handleEmailAlreadyExists(
-            EmailAlreadyExistsException exception) {
+        @ExceptionHandler(EmailAlreadyExistsException.class)
+        public ResponseEntity<ErrorResponse> handleEmailAlreadyExists(
+                        EmailAlreadyExistsException exception) {
 
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.CONFLICT.value(),
-                exception.getMessage(),
-                List.of()
-        );
+                ErrorResponse error = new ErrorResponse(
+                                HttpStatus.CONFLICT.value(),
+                                exception.getMessage(),
+                                List.of());
 
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
-    }
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        }
 
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleUserNotFound(
-            UserNotFoundException exception) {
+        @ExceptionHandler(UserNotFoundException.class)
+        public ResponseEntity<ErrorResponse> handleUserNotFound(
+                        UserNotFoundException exception) {
 
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.NOT_FOUND.value(),
-                exception.getMessage(),
-                List.of()
-        );
+                ErrorResponse error = new ErrorResponse(
+                                HttpStatus.NOT_FOUND.value(),
+                                exception.getMessage(),
+                                List.of());
 
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-    }
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+        }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidation(
-            MethodArgumentNotValidException exception) {
+        @ExceptionHandler(MethodArgumentNotValidException.class)
+        public ResponseEntity<ErrorResponse> handleValidation(
+                        MethodArgumentNotValidException exception) {
 
-        List<FieldErrorDetail> details = exception.getBindingResult()
-                .getFieldErrors()
-                .stream()
-                .map(error -> new FieldErrorDetail(
-                        error.getField(),
-                        error.getDefaultMessage()
-                ))
-                .toList();
+                List<FieldErrorDetail> details = exception.getBindingResult()
+                                .getFieldErrors()
+                                .stream()
+                                .map(error -> new FieldErrorDetail(
+                                                error.getField(),
+                                                error.getDefaultMessage()))
+                                .toList();
 
-        ErrorResponse response = new ErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                "Erro de validação",
-                details
-        );
+                ErrorResponse response = new ErrorResponse(
+                                HttpStatus.BAD_REQUEST.value(),
+                                "Erro de validação",
+                                details);
 
-        return ResponseEntity.badRequest().body(response);
-    }
+                return ResponseEntity.badRequest().body(response);
+        }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgument(
-            IllegalArgumentException exception) {
+        @ExceptionHandler(IllegalArgumentException.class)
+        public ResponseEntity<ErrorResponse> handleIllegalArgument(
+                        IllegalArgumentException exception) {
 
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                exception.getMessage(),
-                List.of()
-        );
+                ErrorResponse error = new ErrorResponse(
+                                HttpStatus.BAD_REQUEST.value(),
+                                exception.getMessage(),
+                                List.of());
 
-        return ResponseEntity.badRequest().body(error);
-    }
+                return ResponseEntity.badRequest().body(error);
+        }
 
-    public record ErrorResponse(
-            int status,
-            String message,
-            List<FieldErrorDetail> errors
-    ) {}
+        @ExceptionHandler(InvalidCredentialsException.class)
+        public ResponseEntity<ErrorResponse> handleInvalidCredentials(
+                        InvalidCredentialsException exception) {
 
-    public record FieldErrorDetail(
-            String field,
-            String message
-    ) {}
+                ErrorResponse error = new ErrorResponse(
+                                HttpStatus.UNAUTHORIZED.value(),
+                                exception.getMessage(),
+                                List.of());
+
+                return ResponseEntity
+                                .status(HttpStatus.UNAUTHORIZED)
+                                .body(error);
+        }
+
+        public record ErrorResponse(
+                        int status,
+                        String message,
+                        List<FieldErrorDetail> errors) {
+        }
+
+        public record FieldErrorDetail(
+                        String field,
+                        String message) {
+        }
 }

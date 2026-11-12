@@ -1,72 +1,132 @@
 package com.beca.ms2_transactions.application.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.beca.ms2_transactions.application.exception.BalanceServiceUnavailableException;
+import com.beca.ms2_transactions.application.exception.UserNotFoundException;
+import com.beca.ms2_transactions.application.exception.UserServiceUnavailableException;
 import com.beca.ms2_transactions.application.port.in.CreateTransactionUseCase;
 import com.beca.ms2_transactions.application.port.in.FindTransactionUseCase;
+import com.beca.ms2_transactions.application.port.out.AccountBalancePort;
 import com.beca.ms2_transactions.application.port.out.TransactionRepositoryPort;
 import com.beca.ms2_transactions.application.port.out.UserValidationPort;
+import com.beca.ms2_transactions.domain.AccountBalance;
 import com.beca.ms2_transactions.domain.Transaction;
 import com.beca.ms2_transactions.domain.TransactionStatus;
 import com.beca.ms2_transactions.domain.TransactionType;
 
 @Service
-public class TransactionService implements CreateTransactionUseCase,
-        FindTransactionUseCase {
+public class TransactionService implements CreateTransactionUseCase, FindTransactionUseCase {
 
     private final TransactionRepositoryPort transactionRepository;
     private final UserValidationPort userValidationPort;
+    private final AccountBalancePort accountBalancePort;
 
     public TransactionService(
             TransactionRepositoryPort transactionRepository,
-            UserValidationPort userValidationPort) {
+            UserValidationPort userValidationPort,
+            AccountBalancePort accountBalancePort) {
 
         this.transactionRepository = transactionRepository;
         this.userValidationPort = userValidationPort;
+        this.accountBalancePort = accountBalancePort;
     }
 
     @Override
+    @Transactional
     public Transaction createTransaction(Transaction transaction) {
 
-        // Valida se o usuário responsável pela transação existe.
-        userValidationPort.validateUserExists(transaction.getUserId());
+        // Valida o usuário responsável pela transação.
+        try {
+            var user = userValidationPort.validateUserExists(transaction.getUserId());
 
-        // Verifica as regras específicas de transferência.
-        if (transaction.getType() == TransactionType.TRANSFER) {
+            // Valida o destinatário de transferências.
+            if (transaction.getType() == TransactionType.TRANSFER) {
 
-            // Rejeita transferência para a própria conta.
-            if (transaction.getDestination().equals(transaction.getUserId())) {
-                return salvarRejeitada(
-                        transaction,
-                        "Não é permitido transferir para si mesmo."
-                );
+                if (transaction.getDestination() == null) {
+                    return salvarRejeitada(
+                            transaction,
+                            "Destinatário não informado.");
+                }
+
+                if (transaction.getDestination().equals(transaction.getUserId())) {
+                    return salvarRejeitada(
+                            transaction,
+                            "Não é permitido transferir para si mesmo.");
+                }
+
+                try {
+                    userValidationPort.validateUserExists(transaction.getDestination());
+
+                } catch (UserNotFoundException exception) {
+                    return salvarRejeitada(
+                            transaction,
+                            "Destinatário não encontrado no MS1.");
+
+                } catch (UserServiceUnavailableException exception) {
+                    return salvarRejeitada(
+                            transaction,
+                            "Serviço de usuários indisponível, tente novamente mais tarde.");
+                }
             }
 
-            // Valida se o destinatário existe.
-            userValidationPort.validateUserExists(
-                    transaction.getDestination()
-            );
-        }
+            // Depósitos não precisam consultar saldo ou limites.
+            if (!exigeSaldo(transaction.getType())) {
+                return transactionRepository.save(transaction);
+            }
 
-        // Saques, compras e transferências exigem saldo suficiente.
-        if (exigeSaldo(transaction.getType())) {
+            // Serializa operações de saída do mesmo usuário.
+            transactionRepository.lockUserTransactions(transaction.getUserId());
 
-            BigDecimal saldo = getBalance(transaction.getUserId());
+            Optional<AccountBalance> accountOptional =
+                    accountBalancePort.findByEmail(user.email());
 
-            if (saldo.compareTo(transaction.getAmount()) < 0) {
+            if (accountOptional.isEmpty()) {
                 return salvarRejeitada(
                         transaction,
-                        "Saldo insuficiente para realizar a transação."
-                );
+                        "Conta não encontrada no serviço de saldo.");
             }
-        }
 
-        // Salva a transação aprovada.
-        return transactionRepository.save(transaction);
+            LocalDate hoje = LocalDate.now(ZoneId.of("America/Sao_Paulo"));
+
+            BigDecimal totalGastoHoje =
+                    transactionRepository.sumApprovedOutflowsByUserAndDate(
+                            transaction.getUserId(),
+                            hoje);
+
+            Optional<String> motivo = accountOptional.get().validarSaida(
+                    transaction.getAmount(),
+                    totalGastoHoje);
+
+            if (motivo.isPresent()) {
+                return salvarRejeitada(transaction, motivo.get());
+            }
+
+            return transactionRepository.save(transaction);
+
+        } catch (UserNotFoundException exception) {
+            // O usuário responsável não existe.
+            // Não registrar uma transação para um usuário inválido.
+            throw exception;
+
+        } catch (UserServiceUnavailableException exception) {
+            return salvarRejeitada(
+                    transaction,
+                    "Serviço de usuários indisponível, tente novamente mais tarde.");
+
+        } catch (BalanceServiceUnavailableException exception) {
+            return salvarRejeitada(
+                    transaction,
+                    "Serviço de saldo indisponível, tente novamente mais tarde.");
+        }
     }
 
     private boolean exigeSaldo(TransactionType type) {
@@ -75,21 +135,19 @@ public class TransactionService implements CreateTransactionUseCase,
                 || type == TransactionType.TRANSFER;
     }
 
-    private Transaction salvarRejeitada(
-            Transaction transaction,
-            String motivo) {
+    private Transaction salvarRejeitada(Transaction transaction, String motivo) {
 
         Transaction rejeitada = new Transaction(
                 transaction.getUserId(),
                 transaction.getType(),
+                transaction.getCategory(),
                 transaction.getDescription(),
                 transaction.getAmount(),
                 transaction.getDate(),
                 transaction.getOrigin(),
                 transaction.getDestination(),
                 TransactionStatus.REJECTED,
-                motivo
-        );
+                motivo);
 
         return transactionRepository.save(rejeitada);
     }
@@ -100,41 +158,24 @@ public class TransactionService implements CreateTransactionUseCase,
     }
 
     @Override
-    public BigDecimal getBalance(UUID userId) {
+    public Optional<AccountBalance> getBalance(UUID userId) {
 
-        BigDecimal saldoEnviadas = transactionRepository.findByUserId(userId)
-                .stream()
-                .filter(transaction ->
-                        transaction.getStatus() == TransactionStatus.APPROVED)
-                .map(transaction -> calcularMovimento(transaction))
-                .reduce(
-                        BigDecimal.ZERO,
-                        (total, valor) -> total.add(valor)
-                );
+        var user = userValidationPort.validateUserExists(userId);
 
-        BigDecimal saldoRecebidas = transactionRepository
-                .findByDestination(userId)
-                .stream()
-                .filter(transaction ->
-                        transaction.getStatus() == TransactionStatus.APPROVED)
-                .filter(transaction ->
-                        transaction.getType() == TransactionType.TRANSFER)
-                .map(transaction -> transaction.getAmount())
-                .reduce(
-                        BigDecimal.ZERO,
-                        (total, valor) -> total.add(valor)
-                );
-
-        return saldoEnviadas.add(saldoRecebidas);
+        return accountBalancePort.findByEmail(user.email());
     }
 
-    private BigDecimal calcularMovimento(Transaction transaction) {
+    @Override
+    public List<Transaction> findTransactions(
+            UUID userId,
+            LocalDate startDate,
+            LocalDate endDate,
+            TransactionType type) {
 
-        return switch (transaction.getType()) {
-            case DEPOSIT -> transaction.getAmount();
-
-            case WITHDRAWAL, PURCHASE, TRANSFER ->
-                    transaction.getAmount().negate();
-        };
+        return transactionRepository.findByFilters(
+                userId,
+                startDate,
+                endDate,
+                type);
     }
 }

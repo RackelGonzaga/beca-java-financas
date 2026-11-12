@@ -17,6 +17,7 @@ public class TransactionTest {
         Transaction transaction = new Transaction(
             UUID.randomUUID(),
             TransactionType.DEPOSIT,
+            Category.OUTROS,
             "Salário",
             new BigDecimal("2500.00"),
             LocalDate.now(),
@@ -36,6 +37,7 @@ public class TransactionTest {
             new Transaction(
                 UUID.randomUUID(),
                 TransactionType.DEPOSIT,
+                Category.OUTROS,
                 "Salário",
                 BigDecimal.ZERO,
                 LocalDate.now(),
@@ -51,6 +53,7 @@ public class TransactionTest {
             new Transaction(
                 UUID.randomUUID(),
                 TransactionType.WITHDRAWAL,
+                Category.OUTROS,
                 "Compra",
                 new BigDecimal("-10.00"),
                 LocalDate.now(),
@@ -66,6 +69,7 @@ public class TransactionTest {
             new Transaction(
                 UUID.randomUUID(),
                 TransactionType.DEPOSIT,
+                Category.OUTROS,
                 "Salário",
                 null,
                 LocalDate.now(),
@@ -80,6 +84,7 @@ public class TransactionTest {
         Transaction transaction = new Transaction(
             UUID.randomUUID(),
             TransactionType.WITHDRAWAL,
+            Category.OUTROS,
             "Compra",
             new BigDecimal("100.00"),
             LocalDate.now(),
@@ -100,6 +105,7 @@ public class TransactionTest {
             new Transaction(
                 UUID.randomUUID(),
                 TransactionType.WITHDRAWAL,
+                Category.OUTROS,
                 "Compra",
                 new BigDecimal("100.00"),
                 LocalDate.now(),
@@ -117,6 +123,7 @@ public class TransactionTest {
             new Transaction(
                 UUID.randomUUID(),
                 TransactionType.DEPOSIT,
+                Category.OUTROS,
                 "Salário",
                 new BigDecimal("2500.00"),
                 LocalDate.now(),
@@ -134,6 +141,7 @@ public class TransactionTest {
             new Transaction(
                 UUID.randomUUID(),
                 TransactionType.DEPOSIT,
+                Category.OUTROS,
                 "Salário",
                 new BigDecimal("2500.00"),
                 LocalDate.now(),
@@ -151,6 +159,7 @@ public class TransactionTest {
             new Transaction(
                 UUID.randomUUID(),
                 TransactionType.TRANSFER,
+                Category.OUTROS,
                 "Transferência",
                 new BigDecimal("100.00"),
                 LocalDate.now(),
@@ -169,6 +178,7 @@ public class TransactionTest {
         Transaction transaction = new Transaction(
             userId,
             TransactionType.TRANSFER,
+            Category.OUTROS,
             "Transferência",
             new BigDecimal("100.00"),
             LocalDate.now(),
@@ -188,6 +198,7 @@ public class TransactionTest {
         Transaction transaction = new Transaction(
             UUID.randomUUID(),
             TransactionType.TRANSFER,
+            Category.OUTROS,
             "Transferência",
             new BigDecimal("100.00"),
             LocalDate.now(),
