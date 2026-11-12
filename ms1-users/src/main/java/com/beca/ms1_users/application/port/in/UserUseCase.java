@@ -18,4 +18,6 @@ public interface UserUseCase {
     void deleteUser(UUID id);
 
     ImportUsersResult importUsers(ImportUsersCommand command);
+
+    User authenticateUser(AuthenticateUserCommand command);
 }

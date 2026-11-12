@@ -28,6 +28,8 @@ import com.beca.ms1_users.domain.User;
 import com.beca.ms1_users.dto.UserRequestDTO;
 import com.beca.ms1_users.dto.UserResponseDTO;
 import com.beca.ms1_users.dto.UserUpdateRequestDTO;
+import com.beca.ms1_users.application.port.in.AuthenticateUserCommand;
+import com.beca.ms1_users.dto.AuthenticateUserRequestDTO;
 
 import jakarta.validation.Valid;
 
@@ -35,127 +37,129 @@ import jakarta.validation.Valid;
 @RequestMapping("/users")
 public class UserController {
 
-    private final UserUseCase userUseCase;
-    private final UserCsvParser userCsvParser;
+        private final UserUseCase userUseCase;
+        private final UserCsvParser userCsvParser;
 
-    public UserController(
-            UserUseCase userUseCase,
-            UserCsvParser userCsvParser) {
+        public UserController(
+                        UserUseCase userUseCase,
+                        UserCsvParser userCsvParser) {
 
-        this.userUseCase = userUseCase;
-        this.userCsvParser = userCsvParser;
-    }
-
-    @PostMapping
-    public ResponseEntity<UserResponseDTO> registerUser(
-            @Valid @RequestBody UserRequestDTO request) {
-
-        RegisterUserCommand command = new RegisterUserCommand(
-                request.getNome(),
-                request.getEmail(),
-                request.getSenha()
-        );
-
-        User user = userUseCase.registerUser(command);
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(toResponseDTO(user));
-    }
-
-    @GetMapping
-    public ResponseEntity<List<UserResponseDTO>> findAllUsers() {
-
-        List<UserResponseDTO> users = userUseCase.findAllUsers()
-                .stream()
-                .map(this::toResponseDTO)
-                .toList();
-
-        return ResponseEntity.ok(users);
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<UserResponseDTO> findUserById(
-            @PathVariable UUID id) {
-
-        User user = userUseCase.findUserById(id);
-
-        return ResponseEntity.ok(toResponseDTO(user));
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<UserResponseDTO> updateUser(
-            @PathVariable UUID id,
-            @Valid @RequestBody UserUpdateRequestDTO request) {
-
-        UpdateUserCommand command = new UpdateUserCommand(
-                request.getNome(),
-                request.getEmail()
-        );
-
-        User user = userUseCase.updateUser(id, command);
-
-        return ResponseEntity.ok(toResponseDTO(user));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(
-            @PathVariable UUID id) {
-
-        userUseCase.deleteUser(id);
-
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping(
-            value = "/import",
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
-    )
-    public ResponseEntity<ImportUsersResult> importUsers(
-            @RequestPart("file") MultipartFile file) {
-
-        if (file.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "O arquivo CSV está vazio"
-            );
+                this.userUseCase = userUseCase;
+                this.userCsvParser = userCsvParser;
         }
 
-        String filename = file.getOriginalFilename();
+        @PostMapping
+        public ResponseEntity<UserResponseDTO> registerUser(
+                        @Valid @RequestBody UserRequestDTO request) {
 
-        if (filename == null
-                || !filename.toLowerCase(Locale.ROOT).endsWith(".csv")) {
+                RegisterUserCommand command = new RegisterUserCommand(
+                                request.getNome(),
+                                request.getEmail(),
+                                request.getSenha());
 
-            throw new IllegalArgumentException(
-                    "O arquivo precisa estar no formato CSV"
-            );
+                User user = userUseCase.registerUser(command);
+
+                return ResponseEntity
+                                .status(HttpStatus.CREATED)
+                                .body(toResponseDTO(user));
         }
 
-        try {
-            var usuarios = userCsvParser.parse(file.getBytes());
+        @GetMapping
+        public ResponseEntity<List<UserResponseDTO>> findAllUsers() {
 
-            ImportUsersCommand command = new ImportUsersCommand(
-                    usuarios
-            );
+                List<UserResponseDTO> users = userUseCase.findAllUsers()
+                                .stream()
+                                .map(this::toResponseDTO)
+                                .toList();
 
-            ImportUsersResult result =
-                    userUseCase.importUsers(command);
-
-            return ResponseEntity.ok(result);
-
-        } catch (IOException exception) {
-            throw new IllegalArgumentException(
-                    "Não foi possível ler o arquivo CSV",
-                    exception
-            );
+                return ResponseEntity.ok(users);
         }
-    }
 
-    private UserResponseDTO toResponseDTO(User user) {
+        @GetMapping("/{id}")
+        public ResponseEntity<UserResponseDTO> findUserById(
+                        @PathVariable UUID id) {
 
-        return new UserResponseDTO(
-                user.getId(),
-                user.getNome(),
-                user.getEmail()
-        );
-    }
+                User user = userUseCase.findUserById(id);
+
+                return ResponseEntity.ok(toResponseDTO(user));
+        }
+
+        @PutMapping("/{id}")
+        public ResponseEntity<UserResponseDTO> updateUser(
+                        @PathVariable UUID id,
+                        @Valid @RequestBody UserUpdateRequestDTO request) {
+
+                UpdateUserCommand command = new UpdateUserCommand(
+                                request.getNome(),
+                                request.getEmail());
+
+                User user = userUseCase.updateUser(id, command);
+
+                return ResponseEntity.ok(toResponseDTO(user));
+        }
+
+        @DeleteMapping("/{id}")
+        public ResponseEntity<Void> deleteUser(
+                        @PathVariable UUID id) {
+
+                userUseCase.deleteUser(id);
+
+                return ResponseEntity.noContent().build();
+        }
+
+        @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        public ResponseEntity<ImportUsersResult> importUsers(
+                        @RequestPart("file") MultipartFile file) {
+
+                if (file.isEmpty()) {
+                        throw new IllegalArgumentException(
+                                        "O arquivo CSV está vazio");
+                }
+
+                String filename = file.getOriginalFilename();
+
+                if (filename == null
+                                || !filename.toLowerCase(Locale.ROOT).endsWith(".csv")) {
+
+                        throw new IllegalArgumentException(
+                                        "O arquivo precisa estar no formato CSV");
+                }
+
+                try {
+                        var usuarios = userCsvParser.parse(file.getBytes());
+
+                        ImportUsersCommand command = new ImportUsersCommand(
+                                        usuarios);
+
+                        ImportUsersResult result = userUseCase.importUsers(command);
+
+                        return ResponseEntity.ok(result);
+
+                } catch (IOException exception) {
+                        throw new IllegalArgumentException(
+                                        "Não foi possível ler o arquivo CSV",
+                                        exception);
+                }
+        }
+
+        private UserResponseDTO toResponseDTO(User user) {
+
+                return new UserResponseDTO(
+                                user.getId(),
+                                user.getNome(),
+                                user.getEmail());
+        }
+
+        @PostMapping("/authenticate")
+        public ResponseEntity<UserResponseDTO> authenticateUser(
+                        @RequestBody AuthenticateUserRequestDTO request) {
+
+                AuthenticateUserCommand command = new AuthenticateUserCommand(
+                                request.email(),
+                                request.senha());
+
+                User user = userUseCase.authenticateUser(command);
+
+                return ResponseEntity.ok(toResponseDTO(user));
+        }
 }
